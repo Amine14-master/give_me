@@ -1,0 +1,1 @@
+flutterfire configure --project=giveme-5e950
