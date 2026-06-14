@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/notification_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({Key? key}) : super(key: key);
+  const NotificationsScreen({super.key});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -25,45 +26,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() {
       _userId = prefs.getString('phoneNumber');
     });
-    // Mark all as read when screen is opened
     NotificationService().markAllAsRead();
   }
 
   IconData _iconForType(String type) {
     switch (type) {
-      case 'like':
-        return Icons.favorite;
-      case 'request':
-        return Icons.pan_tool;
-      case 'accepted':
-        return Icons.check_circle;
-      case 'declined':
-        return Icons.cancel;
-      case 'message':
-        return Icons.chat_bubble;
-      case 'new_post':
-        return Icons.new_releases;
-      default:
-        return Icons.notifications;
+      case 'like': return Icons.favorite_rounded;
+      case 'request': return Icons.volunteer_activism_rounded;
+      case 'accepted': return Icons.check_circle_rounded;
+      case 'declined': return Icons.cancel_rounded;
+      case 'message': return Icons.chat_bubble_rounded;
+      case 'new_post': return Icons.new_releases_rounded;
+      default: return Icons.notifications_rounded;
     }
   }
 
   Color _colorForType(String type) {
     switch (type) {
-      case 'like':
-        return AppTheme.error;
-      case 'request':
-        return AppTheme.accent;
-      case 'accepted':
-        return AppTheme.success;
-      case 'declined':
-        return Colors.grey;
-      case 'message':
-        return AppTheme.primary;
-      case 'new_post':
-        return Colors.blue;
-      default:
-        return AppTheme.textMuted;
+      case 'like': return AppTheme.warmCoral;
+      case 'request': return AppTheme.accent;
+      case 'accepted': return AppTheme.success;
+      case 'declined': return const Color(0xFF94A3B8);
+      case 'message': return AppTheme.primary;
+      case 'new_post': return AppTheme.info;
+      default: return AppTheme.textMuted;
     }
   }
 
@@ -84,19 +70,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_userId == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppTheme.primary)));
     }
 
     return Scaffold(
+      backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text('Notifications', style: AppTheme.headingMd),
         backgroundColor: Colors.white,
-        elevation: 0,
+        surfaceTintColor: Colors.transparent,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.clear_all, color: AppTheme.textMuted),
-            tooltip: 'Clear all',
+          TextButton.icon(
             onPressed: _clearAll,
+            icon: const Icon(Icons.clear_all_rounded, size: 20, color: AppTheme.textMuted),
+            label: Text('Clear', style: GoogleFonts.inter(color: AppTheme.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -108,7 +95,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .onValue,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5));
           }
 
           if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
@@ -116,9 +103,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.notifications_none, size: 64, color: AppTheme.textMuted.withOpacity(0.4)),
-                  const SizedBox(height: 16),
-                  const Text('No notifications yet', style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceVariant,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.notifications_none_rounded, size: 40, color: AppTheme.textMuted.withValues(alpha: 0.4)),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('No notifications yet', style: AppTheme.headingSm.copyWith(color: AppTheme.textMuted)),
+                  const SizedBox(height: 8),
+                  Text('We\'ll let you know when something happens', style: AppTheme.bodySm),
                 ],
               ),
             );
@@ -129,7 +126,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ..sort((a, b) {
               final ta = (a.value as Map)['timestamp'] as int? ?? 0;
               final tb = (b.value as Map)['timestamp'] as int? ?? 0;
-              return tb.compareTo(ta); // newest first
+              return tb.compareTo(ta);
             });
 
           return ListView.builder(
@@ -142,30 +139,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               final body = notif['body'] as String? ?? '';
               final isRead = notif['read'] == true;
               final timestamp = notif['timestamp'] as int? ?? 0;
+              final color = _colorForType(type);
 
               return Container(
-                color: isRead ? Colors.transparent : AppTheme.primaryLight.withOpacity(0.08),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isRead ? Colors.white : Colors.white,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  border: isRead ? null : Border.all(color: color.withValues(alpha: 0.15), width: 1),
+                  boxShadow: isRead ? [] : AppTheme.softShadow,
+                ),
                 child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: Container(
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: _colorForType(type).withOpacity(0.12),
-                      shape: BoxShape.circle,
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                     ),
-                    child: Icon(_iconForType(type), color: _colorForType(type), size: 22),
+                    child: Icon(_iconForType(type), color: color, size: 22),
                   ),
-                  title: Text(title, style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold, fontSize: 14)),
+                  title: Text(title, style: GoogleFonts.inter(
+                    fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                    fontSize: 14,
+                    color: AppTheme.textPrimary,
+                  )),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(body, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary), maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Text(_timeAgo(timestamp), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      const SizedBox(height: 4),
+                      Text(body, style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Text(_timeAgo(timestamp), style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w500)),
                     ],
                   ),
                   isThreeLine: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 ),
               );
             },

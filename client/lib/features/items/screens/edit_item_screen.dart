@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 
 class EditItemScreen extends StatefulWidget {
@@ -9,12 +10,12 @@ class EditItemScreen extends StatefulWidget {
   final String initialCategory;
 
   const EditItemScreen({
-    Key? key,
+    super.key,
     required this.itemId,
     required this.initialTitle,
     required this.initialDesc,
     required this.initialCategory,
-  }) : super(key: key);
+  });
 
   @override
   State<EditItemScreen> createState() => _EditItemScreenState();
@@ -41,7 +42,14 @@ class _EditItemScreenState extends State<EditItemScreen> {
 
   void _submit() async {
     if (_titleController.text.isEmpty || _descController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please fill all fields'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
       return;
     }
     
@@ -56,7 +64,12 @@ class _EditItemScreenState extends State<EditItemScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Item updated successfully!'), backgroundColor: AppTheme.success),
+          SnackBar(
+            content: const Text('Item updated successfully! ✅'),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
         );
         Navigator.pop(context);
       }
@@ -76,40 +89,102 @@ class _EditItemScreenState extends State<EditItemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Item')),
+      backgroundColor: AppTheme.scaffoldBg,
+      appBar: AppBar(
+        title: Text('Edit Item', style: AppTheme.headingMd),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text('Title', style: AppTheme.labelMd),
+            const SizedBox(height: 8),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Title'),
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: 'Item title',
+                hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
+              ),
             ),
             const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedCategory = val);
-              },
+
+            Text('Category', style: AppTheme.labelMd),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              ),
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedCategory,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                ),
+                style: GoogleFonts.inter(fontSize: 15, color: AppTheme.textPrimary),
+                items: _categories.map((cat) {
+                  final style = AppTheme.categoryStyles[cat];
+                  return DropdownMenuItem(
+                    value: cat,
+                    child: Row(
+                      children: [
+                        Text(style?['emoji'] ?? '📦', style: const TextStyle(fontSize: 18)),
+                        const SizedBox(width: 10),
+                        Text(cat),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) setState(() => _selectedCategory = val);
+                },
+              ),
             ),
             const SizedBox(height: 20),
+
+            Text('Description', style: AppTheme.labelMd),
+            const SizedBox(height: 8),
             TextField(
               controller: _descController,
               maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Description',
+              style: GoogleFonts.inter(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Update item details...',
+                hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
                 alignLabelWithHint: true,
               ),
             ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _submit,
-              child: _isLoading 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Save Changes', style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 32),
+
+            GestureDetector(
+              onTap: _isLoading ? null : _submit,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  gradient: _isLoading ? null : AppTheme.primaryGradient,
+                  color: _isLoading ? AppTheme.textMuted.withValues(alpha: 0.3) : null,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  boxShadow: _isLoading ? [] : AppTheme.glowShadow(AppTheme.primary),
+                ),
+                child: Center(
+                  child: _isLoading
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.save_rounded, color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Text('Save Changes', style: GoogleFonts.inter(
+                              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700,
+                            )),
+                          ],
+                        ),
+                ),
+              ),
             ),
           ],
         ),

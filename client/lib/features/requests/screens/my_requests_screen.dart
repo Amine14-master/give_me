@@ -1,25 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/item_requests_screen.dart';
 
 class MyRequestsScreen extends StatefulWidget {
-  const MyRequestsScreen({Key? key}) : super(key: key);
+  const MyRequestsScreen({super.key});
 
   @override
   State<MyRequestsScreen> createState() => _MyRequestsScreenState();
 }
 
-class _MyRequestsScreenState extends State<MyRequestsScreen> {
+class _MyRequestsScreenState extends State<MyRequestsScreen> with SingleTickerProviderStateMixin {
   String? _currentUserId;
   late final Stream<DatabaseEvent> _itemsStream;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _itemsStream = FirebaseDatabase.instance.ref().child('items').onValue.asBroadcastStream();
     _loadUser();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
@@ -32,48 +42,62 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_currentUserId == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppTheme.primary)));
     }
 
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Requests Hub'),
-          backgroundColor: Colors.white,
-          elevation: 0,
-          bottom: const TabBar(
-            labelColor: AppTheme.primary,
-            unselectedLabelColor: AppTheme.textMuted,
-            indicatorColor: AppTheme.primary,
-            tabs: [
-              Tab(text: 'My Reqs'),
-              Tab(text: 'For Me'),
-              Tab(text: 'Historique'),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: AppTheme.scaffoldBg,
+      appBar: AppBar(
+        title: Text('Requests', style: AppTheme.headingMd),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppTheme.primary,
+          unselectedLabelColor: AppTheme.textMuted,
+          indicatorColor: AppTheme.primary,
+          indicatorWeight: 3,
+          indicatorSize: TabBarIndicatorSize.label,
+          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+          unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 13),
+          tabs: const [
+            Tab(text: 'My Requests'),
+            Tab(text: 'For Me'),
+            Tab(text: 'History'),
+          ],
         ),
-        body: StreamBuilder(
-          stream: _itemsStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
-              return const Center(child: Text('No requests found.', style: TextStyle(color: AppTheme.textMuted)));
-            }
-
-            final Map<dynamic, dynamic> itemsMap = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-
-            return TabBarView(
-              children: [
-                _buildRequestsList(tabIndex: 0, itemsMap: itemsMap),
-                _buildRequestsList(tabIndex: 1, itemsMap: itemsMap),
-                _buildRequestsList(tabIndex: 2, itemsMap: itemsMap),
-              ],
+      ),
+      body: StreamBuilder(
+        stream: _itemsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5));
+          }
+          if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_rounded, size: 56, color: AppTheme.textMuted.withValues(alpha: 0.3)),
+                  const SizedBox(height: 16),
+                  Text('No requests found', style: AppTheme.headingSm.copyWith(color: AppTheme.textMuted)),
+                ],
+              ),
             );
-          },
-        ),
+          }
+
+          final Map<dynamic, dynamic> itemsMap = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildRequestsList(tabIndex: 0, itemsMap: itemsMap),
+              _buildRequestsList(tabIndex: 1, itemsMap: itemsMap),
+              _buildRequestsList(tabIndex: 2, itemsMap: itemsMap),
+            ],
+          );
+        },
       ),
     );
   }
@@ -92,73 +116,129 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
         if (iRequested) {
           final status = requests[_currentUserId]['status'] as String? ?? 'pending';
           if (status == 'pending') {
-            item['_displayStatus'] = 'PENDING';
-            item['_displayColor'] = Colors.orange;
-            displayList.add(item);
+            displayList.add({
+              'item': item,
+              'title': item['title'] ?? 'Item',
+              'subtitle': 'Waiting for owner response',
+              'displayStatus': 'PENDING',
+              'displayColor': AppTheme.accent,
+              'icon': Icons.hourglass_top_rounded,
+            });
           }
         }
       } else if (tabIndex == 1) {
         if (isOwner) {
-          final hasPending = requests.values.any((r) => (r as Map)['status'] == 'pending');
-          if (hasPending) {
-            item['_displayStatus'] = 'NEEDS REVIEW';
-            item['_displayColor'] = AppTheme.accent;
-            displayList.add(item);
+          final pendingCount = requests.values.where((r) => (r as Map)['status'] == 'pending').length;
+          if (pendingCount > 0) {
+            displayList.add({
+              'item': item,
+              'title': item['title'] ?? 'Item',
+              'subtitle': '$pendingCount pending request${pendingCount > 1 ? 's' : ''}',
+              'displayStatus': 'REVIEW',
+              'displayColor': AppTheme.info,
+              'icon': Icons.rate_review_rounded,
+            });
           }
         }
       } else if (tabIndex == 2) {
         if (iRequested) {
           final status = requests[_currentUserId]['status'] as String? ?? 'pending';
           if (status == 'accepted') {
-            item['_displayStatus'] = 'ACCEPTED (ME)';
-            item['_displayColor'] = AppTheme.success;
-            displayList.add(item);
+            displayList.add({
+              'item': item,
+              'title': item['title'] ?? 'Item',
+              'subtitle': 'Owner accepted your request',
+              'displayStatus': 'ACCEPTED',
+              'displayColor': AppTheme.success,
+              'icon': Icons.check_circle_rounded,
+            });
           } else if (status == 'declined') {
-            item['_displayStatus'] = 'DECLINED (ME)';
-            item['_displayColor'] = AppTheme.error;
-            displayList.add(item);
+            displayList.add({
+              'item': item,
+              'title': item['title'] ?? 'Item',
+              'subtitle': 'Owner declined your request',
+              'displayStatus': 'DECLINED',
+              'displayColor': AppTheme.error,
+              'icon': Icons.cancel_rounded,
+            });
           }
-        } else if (isOwner) {
+        }
+
+        if (isOwner) {
+          requests.forEach((reqId, reqData) {
+            final status = (reqData as Map)['status'] as String? ?? 'pending';
+            if (status == 'accepted') {
+              displayList.add({
+                'item': item,
+                'title': 'Request from $reqId',
+                'subtitle': 'You accepted for ${item['title']}',
+                'displayStatus': 'GIVEN',
+                'displayColor': AppTheme.info,
+                'icon': Icons.volunteer_activism_rounded,
+              });
+            } else if (status == 'declined') {
+              displayList.add({
+                'item': item,
+                'title': 'Request from $reqId',
+                'subtitle': 'You declined for ${item['title']}',
+                'displayStatus': 'DECLINED',
+                'displayColor': const Color(0xFF94A3B8),
+                'icon': Icons.block_rounded,
+              });
+            }
+          });
+
           final itemStatus = item['status'] as String? ?? 'available';
           if (itemStatus == 'deleted') {
-            item['_displayStatus'] = 'DELETED';
-            item['_displayColor'] = Colors.black;
-            displayList.add(item);
-          } else if (itemStatus == 'claimed') {
-            item['_displayStatus'] = 'GIVEN AWAY';
-            item['_displayColor'] = Colors.blue;
-            displayList.add(item);
-          } else {
-            final hasDeclined = requests.values.any((r) => (r as Map)['status'] == 'declined');
-            if (hasDeclined) {
-              item['_displayStatus'] = 'DECLINED REQ(S)';
-              item['_displayColor'] = Colors.grey;
-              displayList.add(item);
-            }
+            displayList.add({
+              'item': item,
+              'title': item['title'] ?? 'Item',
+              'subtitle': 'All requests declined — auto deleted',
+              'displayStatus': 'DELETED',
+              'displayColor': const Color(0xFF1E293B),
+              'icon': Icons.delete_forever_rounded,
+            });
           }
         }
       }
     });
 
     if (displayList.isEmpty) {
-      return const Center(child: Text('No items to display.', style: TextStyle(color: AppTheme.textMuted)));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_rounded, size: 48, color: AppTheme.textMuted.withValues(alpha: 0.3)),
+            const SizedBox(height: 12),
+            Text('Nothing here', style: AppTheme.bodySm),
+          ],
+        ),
+      );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: displayList.length,
       itemBuilder: (context, index) {
-        final item = displayList[index];
-        final displayStatus = item['_displayStatus'] as String;
-        final displayColor = item['_displayColor'] as Color;
+        final entry = displayList[index];
+        final item = entry['item'] as Map<String, dynamic>;
+        final displayStatus = entry['displayStatus'] as String;
+        final displayColor = entry['displayColor'] as Color;
+        final title = entry['title'] as String;
+        final subtitle = entry['subtitle'] as String;
+        final icon = entry['icon'] as IconData;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            boxShadow: AppTheme.softShadow,
+          ),
           child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             onTap: () {
               if (tabIndex == 1) {
-                // If in "Requests For Me", clicking opens the ItemRequestsScreen
                 Navigator.push(context, MaterialPageRoute(
                   builder: (_) => ItemRequestsScreen(itemId: item['id'], requests: item['requests'] as Map? ?? {}),
                 ));
@@ -168,19 +248,35 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: AppTheme.primaryLight.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                image: item['imageUrl'] != null
-                    ? DecorationImage(image: NetworkImage(item['imageUrl']), fit: BoxFit.cover)
-                    : null,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                color: AppTheme.surfaceVariant,
               ),
-              child: item['imageUrl'] == null ? const Icon(Icons.image, color: AppTheme.primary) : null,
+              clipBehavior: Clip.antiAlias,
+              child: item['imageUrl'] != null
+                  ? CachedNetworkImage(imageUrl: item['imageUrl'], fit: BoxFit.cover)
+                  : Icon(Icons.volunteer_activism_rounded, color: AppTheme.primary.withValues(alpha: 0.5)),
             ),
-            title: Text(item['title'] ?? 'Item', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(tabIndex == 1 ? 'Pending Reqs: ${item['requests'].length}' : 'Owner: ${item['userId']}'),
-            trailing: Chip(
-              label: Text(displayStatus, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-              backgroundColor: displayColor,
+            title: Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textMuted)),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: displayColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 14, color: displayColor),
+                  const SizedBox(width: 4),
+                  Text(displayStatus, style: GoogleFonts.inter(
+                    fontSize: 10, fontWeight: FontWeight.w700, color: displayColor,
+                  )),
+                ],
+              ),
             ),
           ),
         );

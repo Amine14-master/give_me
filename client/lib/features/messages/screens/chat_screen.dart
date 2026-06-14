@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/notification_helper.dart';
 
@@ -10,11 +11,11 @@ class ChatScreen extends StatefulWidget {
   final String? itemTitle;
 
   const ChatScreen({
-    Key? key,
+    super.key,
     required this.chatId,
     required this.otherUserId,
     this.itemTitle,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -48,7 +49,6 @@ class _ChatScreenState extends State<ChatScreen> {
       'timestamp': ServerValue.timestamp,
     });
 
-    // Update latest message metadata for the chat thread
     _chatsRef.child(widget.chatId).update({
       'participants': {
         _currentUserId: true,
@@ -59,7 +59,6 @@ class _ChatScreenState extends State<ChatScreen> {
       'itemTitle': widget.itemTitle,
     });
 
-    // Notify the other user
     NotificationHelper.onMessage(
       targetUserId: widget.otherUserId,
       senderUserId: _currentUserId!,
@@ -72,13 +71,33 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: Row(
           children: [
-            Text(widget.otherUserId, style: const TextStyle(fontSize: 16)),
-            if (widget.itemTitle != null)
-              Text('Re: ${widget.itemTitle}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.otherUserId, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                  if (widget.itemTitle != null)
+                    Text('Re: ${widget.itemTitle}', style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textMuted)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -89,35 +108,59 @@ class _ChatScreenState extends State<ChatScreen> {
               stream: _chatsRef.child(widget.chatId).child('messages').orderByChild('timestamp').onValue,
               builder: (context, snapshot) {
                 if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
-                  return const Center(child: Text('Say hi! 👋', style: TextStyle(color: AppTheme.textMuted)));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('👋', style: const TextStyle(fontSize: 48)),
+                        const SizedBox(height: 12),
+                        Text('Say hi!', style: AppTheme.headingSm.copyWith(color: AppTheme.textMuted)),
+                      ],
+                    ),
+                  );
                 }
 
                 final Map<dynamic, dynamic> map = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
                 final messages = map.entries.map((e) => Map<String, dynamic>.from(e.value as Map)).toList();
-                messages.sort((a, b) => (b['timestamp'] ?? 0).compareTo(a['timestamp'] ?? 0)); // reversed list
+                messages.sort((a, b) => (b['timestamp'] ?? 0).compareTo(a['timestamp'] ?? 0));
 
                 return ListView.builder(
                   reverse: true,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMe = msg['senderId'] == _currentUserId;
+
                     return Align(
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                         decoration: BoxDecoration(
-                          color: isMe ? AppTheme.primary : AppTheme.primaryLight.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(16).copyWith(
-                            bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(16),
-                            bottomLeft: !isMe ? const Radius.circular(0) : const Radius.circular(16),
+                          color: isMe ? AppTheme.primary : Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(18),
+                            topRight: const Radius.circular(18),
+                            bottomLeft: Radius.circular(isMe ? 18 : 4),
+                            bottomRight: Radius.circular(isMe ? 4 : 18),
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (isMe ? AppTheme.primary : Colors.black).withValues(alpha: 0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Text(
                           msg['text'] ?? '',
-                          style: TextStyle(color: isMe ? Colors.white : AppTheme.textPrimary),
+                          style: GoogleFonts.inter(
+                            color: isMe ? Colors.white : AppTheme.textPrimary,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                     );
@@ -126,33 +169,48 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
+
+          // ── Input Bar ──
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, -2))],
             ),
             child: SafeArea(
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _msgController,
-                      decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                        filled: true,
-                        fillColor: AppTheme.primaryLight.withOpacity(0.1),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.scaffoldBg,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                      ),
+                      child: TextField(
+                        controller: _msgController,
+                        style: GoogleFonts.inter(fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Type a message...',
+                          hintStyle: GoogleFonts.inter(color: AppTheme.textMuted, fontSize: 14),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: AppTheme.primary,
-                    child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                      onPressed: _sendMessage,
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: AppTheme.glowShadow(AppTheme.primary),
+                      ),
+                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                     ),
                   ),
                 ],

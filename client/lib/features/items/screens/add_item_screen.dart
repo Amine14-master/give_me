@@ -8,12 +8,13 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:latlong2/latlong.dart' as ll;
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../navigation/screens/main_container.dart';
 import 'location_picker_screen.dart';
 
 class AddItemScreen extends StatefulWidget {
-  const AddItemScreen({Key? key}) : super(key: key);
+  const AddItemScreen({super.key});
 
   @override
   State<AddItemScreen> createState() => _AddItemScreenState();
@@ -49,12 +50,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
     if (_imageFile == null) return null;
     try {
       final url = Uri.parse('https://api.cloudinary.com/v1_1/drbsi3edb/image/upload');
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = 'giveme';
-      
+      final request = http.MultipartRequest('POST', url)..fields['upload_preset'] = 'giveme';
       final bytes = await _imageFile!.readAsBytes();
       request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: _imageFile!.name));
-
       final response = await request.send();
       if (response.statusCode == 200) {
         final responseData = await response.stream.bytesToString();
@@ -72,7 +70,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) throw Exception('Location services disabled');
-
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -80,7 +77,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         throw Exception('Location permissions denied');
       }
-
       Position position = await Geolocator.getCurrentPosition();
       await _updateLocationFromCoordinates(position.latitude, position.longitude);
     } catch (e) {
@@ -112,13 +108,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
       List<Placemark> placemarks = await placemarkFromCoordinates(latitude, longitude);
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
-        // Build a rich name: prefer subLocality (baladiya/neighborhood), then locality (city)
         final parts = <String>[
           if (place.subLocality != null && place.subLocality!.isNotEmpty) place.subLocality!,
           if (place.locality != null && place.locality!.isNotEmpty && place.locality != place.subLocality) place.locality!,
           if (place.subAdministrativeArea != null && place.subAdministrativeArea!.isNotEmpty && place.subAdministrativeArea != place.locality) place.subAdministrativeArea!,
         ];
-        // Fallback to administrative area if parts is empty
         if (parts.isEmpty && place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
           parts.add(place.administrativeArea!);
         }
@@ -143,14 +137,24 @@ class _AddItemScreenState extends State<AddItemScreen> {
   void _submit() async {
     if (_titleController.text.isEmpty || _descController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
+        SnackBar(
+          content: const Text('Please fill all fields'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       );
       return;
     }
 
     if (_lat == null || _lng == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a location')),
+        SnackBar(
+          content: const Text('Please select a location'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       );
       return;
     }
@@ -158,9 +162,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() => _isLoading = true);
     
     try {
-
       String? imageUrl = await _uploadImage();
-
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('phoneNumber') ?? 'unknown';
       final ref = FirebaseDatabase.instance.ref().child('items').push();
@@ -186,9 +188,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Item added successfully!'),
+            content: const Text('Item added successfully! 🎉'),
             backgroundColor: AppTheme.success,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
         _titleController.clear();
@@ -216,29 +219,32 @@ class _AddItemScreenState extends State<AddItemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Give an Item')),
+      backgroundColor: AppTheme.scaffoldBg,
+      appBar: AppBar(
+        title: Text('Give an Item', style: AppTheme.headingMd),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ── Image Picker ──
             GestureDetector(
               onTap: _pickImage,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                height: 220,
+                height: 200,
                 decoration: BoxDecoration(
-                  color: _imageFile != null ? Colors.transparent : AppTheme.primaryLight.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                  color: _imageFile != null ? Colors.transparent : AppTheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                   border: Border.all(
-                    color: _imageFile != null ? AppTheme.primary : Colors.transparent,
-                    width: 2,
+                    color: _imageFile != null ? AppTheme.primary : Colors.grey.shade200,
+                    width: _imageFile != null ? 2 : 1,
                   ),
                   image: _imageBytes != null
-                      ? DecorationImage(
-                          image: MemoryImage(_imageBytes!), // Use MemoryImage for web
-                          fit: BoxFit.cover,
-                        )
+                      ? DecorationImage(image: MemoryImage(_imageBytes!), fit: BoxFit.cover)
                       : null,
                 ),
                 child: _imageFile == null
@@ -246,98 +252,202 @@ class _AddItemScreenState extends State<AddItemScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.08),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.add_a_photo, size: 36, color: AppTheme.primary),
+                            child: const Icon(Icons.add_a_photo_rounded, size: 32, color: AppTheme.primary),
                           ),
                           const SizedBox(height: 12),
-                          const Text('Upload a clear photo', style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.primary)),
+                          Text('Upload a clear photo', style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600, color: AppTheme.primary, fontSize: 14,
+                          )),
+                          const SizedBox(height: 4),
+                          Text('Tap to add', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textMuted)),
                         ],
                       )
                     : null,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+
+            // ── Title ──
+            Text('Title', style: AppTheme.labelMd),
+            const SizedBox(height: 8),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: 'What are you giving away?'),
-            ),
-            const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedCategory = val);
-              },
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _descController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                alignLabelWithHint: true,
-                hintText: 'Any specific details? Condition? Pick-up info?',
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: 'What are you giving away?',
+                hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
               ),
             ),
             const SizedBox(height: 20),
-            Text('Location', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+
+            // ── Category ──
+            Text('Category', style: AppTheme.labelMd),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              ),
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedCategory,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                ),
+                style: GoogleFonts.inter(fontSize: 15, color: AppTheme.textPrimary),
+                items: _categories.map((cat) {
+                  final style = AppTheme.categoryStyles[cat];
+                  return DropdownMenuItem(
+                    value: cat,
+                    child: Row(
+                      children: [
+                        Text(style?['emoji'] ?? '📦', style: const TextStyle(fontSize: 18)),
+                        const SizedBox(width: 10),
+                        Text(cat),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) setState(() => _selectedCategory = val);
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Description ──
+            Text('Description', style: AppTheme.labelMd),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descController,
+              maxLines: 4,
+              style: GoogleFonts.inter(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Condition? Pick-up info? Any details...',
+                hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Location ──
+            Text('Location', style: AppTheme.labelMd),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                border: Border.all(color: Colors.grey.shade300),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Column(
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: AppTheme.error),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _locationName.isEmpty ? 'No location selected' : _locationName,
-                          style: TextStyle(color: _locationName.isEmpty ? AppTheme.textMuted : AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _locationName.isNotEmpty ? AppTheme.success.withValues(alpha: 0.1) : AppTheme.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _getCurrentLocation,
-                          icon: const Icon(Icons.gps_fixed),
-                          label: const Text('Auto'),
+                        child: Icon(
+                          _locationName.isNotEmpty ? Icons.location_on_rounded : Icons.location_off_rounded,
+                          color: _locationName.isNotEmpty ? AppTheme.success : AppTheme.error,
+                          size: 20,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _pickOnMap,
-                          icon: const Icon(Icons.map),
-                          label: const Text('Map'),
+                        child: Text(
+                          _locationName.isEmpty ? 'No location selected' : _locationName,
+                          style: GoogleFonts.inter(
+                            color: _locationName.isEmpty ? AppTheme.textMuted : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
-                  )
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLocationButton(
+                          icon: Icons.gps_fixed_rounded,
+                          label: 'Auto',
+                          onTap: _isLoading ? null : _getCurrentLocation,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildLocationButton(
+                          icon: Icons.map_rounded,
+                          label: 'Pick on Map',
+                          onTap: _isLoading ? null : _pickOnMap,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _submit,
-              child: _isLoading 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Give Away', style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 32),
+
+            // ── Submit ──
+            GestureDetector(
+              onTap: _isLoading ? null : _submit,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  gradient: _isLoading ? null : AppTheme.primaryGradient,
+                  color: _isLoading ? AppTheme.textMuted.withValues(alpha: 0.3) : null,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  boxShadow: _isLoading ? [] : AppTheme.glowShadow(AppTheme.primary),
+                ),
+                child: Center(
+                  child: _isLoading
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.volunteer_activism_rounded, color: Colors.white, size: 22),
+                            const SizedBox(width: 10),
+                            Text('Give Away', style: GoogleFonts.inter(
+                              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700,
+                            )),
+                          ],
+                        ),
+                ),
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationButton({required IconData icon, required String label, VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.scaffoldBg,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: AppTheme.primary),
+            const SizedBox(width: 6),
+            Text(label, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.primary)),
           ],
         ),
       ),

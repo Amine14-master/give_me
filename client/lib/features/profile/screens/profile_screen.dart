@@ -1,14 +1,18 @@
+import 'dart:ui';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/screens/login_screen.dart';
+import 'saved_items_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -38,13 +42,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final ref = FirebaseDatabase.instance.ref();
     
-    // Load profile picture
     final userSnapshot = await ref.child('users/$userId/profileImage').get();
     if (userSnapshot.exists) {
       setState(() => _profileImageUrl = userSnapshot.value as String);
     }
 
-    // Load stats
     final statsSnapshot = await ref.child('users/$userId/stats').get();
     if (statsSnapshot.exists) {
       final stats = statsSnapshot.value as Map;
@@ -83,7 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload image: $e'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text('Failed to upload: $e'), backgroundColor: AppTheme.error),
         );
       }
     } finally {
@@ -105,99 +107,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.scaffoldBg,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
+          // ── Premium Glassmorphic Header ──
           SliverAppBar(
-            expandedHeight: 280,
+            expandedHeight: 300,
             pinned: true,
+            backgroundColor: AppTheme.primaryDark,
+            surfaceTintColor: Colors.transparent,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(gradient: AppTheme.heroGradient),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 40),
-                    GestureDetector(
-                      onTap: _pickAndUploadImage,
-                      child: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 50,
-                            backgroundColor: Colors.white,
-                            backgroundImage: _profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null,
-                            child: _profileImageUrl == null
-                                ? const Icon(Icons.person, size: 50, color: AppTheme.primary)
-                                : null,
-                          ),
-                          if (_isLoading)
-                            const Positioned.fill(
-                              child: CircularProgressIndicator(color: AppTheme.accent),
-                            ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: AppTheme.accent,
+                child: SafeArea(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 20),
+
+                      // ── Avatar ──
+                      GestureDetector(
+                        onTap: _pickAndUploadImage,
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 3),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 8)),
+                                ],
                               ),
-                              child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                              child: CircleAvatar(
+                                radius: 47,
+                                backgroundColor: Colors.white.withValues(alpha: 0.15),
+                                backgroundImage: _profileImageUrl != null ? CachedNetworkImageProvider(_profileImageUrl!) : null,
+                                child: _profileImageUrl == null
+                                    ? const Icon(Icons.person_rounded, size: 48, color: Colors.white)
+                                    : null,
+                              ),
+                            ),
+                            if (_isLoading)
+                              const Positioned.fill(
+                                child: CircularProgressIndicator(color: AppTheme.accentLight, strokeWidth: 3),
+                              ),
+                            Positioned(
+                              bottom: 2,
+                              right: 2,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _currentUserId ?? 'Guest',
+                        style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Community Member',
+                        style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── Glassmorphic Stats Row ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildGlassStat('$_itemsGivenCount', 'Given'),
+                                  _buildDivider(),
+                                  _buildGlassStat('$_requestsMade', 'Requests'),
+                                  _buildDivider(),
+                                  _buildGlassStat('$_accepted', 'Won'),
+                                  _buildDivider(),
+                                  _buildGlassStat('$_declined', 'Lost'),
+                                ],
+                              ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _currentUserId ?? 'Guest',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const Text(
-                      'Joined recently',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
+
+          // ── Menu Items ──
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 1.5,
-                    children: [
-                      _buildStatCard('Posts', '$_itemsGivenCount'),
-                      _buildStatCard('Requests', '$_requestsMade'),
-                      _buildStatCard('Accepted', '$_accepted'),
-                      _buildStatCard('Declined', '$_declined'),
-                    ],
+                  Text('Settings', style: AppTheme.labelMd),
+                  const SizedBox(height: 12),
+                  _buildMenuTile(Icons.history_rounded, 'Giving History', AppTheme.primary),
+                  _buildMenuTile(
+                    Icons.favorite_border_rounded, 
+                    'Saved Items', 
+                    AppTheme.warmCoral,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedItemsScreen()));
+                    },
                   ),
-                  const SizedBox(height: 32),
-                  _buildMenuTile(Icons.history, 'Giving History'),
-                  _buildMenuTile(Icons.favorite_border, 'Saved Items'),
-                  _buildMenuTile(Icons.settings, 'Settings'),
-                  _buildMenuTile(Icons.help_outline, 'Help & Support'),
+                  _buildMenuTile(Icons.settings_rounded, 'Preferences', AppTheme.textSecondary),
+                  _buildMenuTile(Icons.help_outline_rounded, 'Help & Support', AppTheme.info),
                   const SizedBox(height: 24),
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.error.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.logout, color: AppTheme.error),
+
+                  // ── Logout ──
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      border: Border.all(color: AppTheme.error.withValues(alpha: 0.15)),
                     ),
-                    title: const Text('Log Out', style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold)),
-                    onTap: () => _logout(context),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusMd)),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.logout_rounded, color: AppTheme.error, size: 20),
+                      ),
+                      title: Text('Log Out', style: GoogleFonts.inter(color: AppTheme.error, fontWeight: FontWeight.w700, fontSize: 15)),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.error, size: 20),
+                      onTap: () => _logout(context),
+                    ),
                   ),
                 ],
               ),
@@ -208,41 +273,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        children: [
-          Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.primary)),
-          const SizedBox(height: 4),
-          Text(title, style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
-        ],
-      ),
+  Widget _buildGlassStat(String value, String label) {
+    return Column(
+      children: [
+        Text(value, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
+        const SizedBox(height: 2),
+        Text(label, style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w500)),
+      ],
     );
   }
 
-  Widget _buildMenuTile(IconData icon, String title) {
+  Widget _buildDivider() {
+    return Container(
+      height: 30,
+      width: 1,
+      color: Colors.white.withValues(alpha: 0.15),
+    );
+  }
+
+  Widget _buildMenuTile(IconData icon, String title, Color iconColor, {VoidCallback? onTap}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusMd)),
-        tileColor: Colors.white,
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryLight.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: AppTheme.primary),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          boxShadow: AppTheme.softShadow,
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
-        onTap: () {},
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusMd)),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          title: Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15, color: AppTheme.textPrimary)),
+          trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 20),
+          onTap: onTap ?? () {},
+        ),
       ),
     );
   }

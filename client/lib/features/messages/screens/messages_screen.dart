@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/theme/app_theme.dart';
 import 'chat_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
-  const MessagesScreen({Key? key}) : super(key: key);
+  const MessagesScreen({super.key});
 
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
@@ -28,32 +30,52 @@ class _MessagesScreenState extends State<MessagesScreen> {
     });
   }
 
+  String _timeAgo(int timestamp) {
+    final diff = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(timestamp));
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    return '${diff.inDays ~/ 7}w';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_currentUserId == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppTheme.primary)));
     }
 
     return Scaffold(
+      backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: const Text('Messages'),
-        elevation: 0,
+        title: Text('Messages', style: AppTheme.headingMd),
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
       ),
       body: StreamBuilder(
         stream: _chatsRef.orderByChild('participants/$_currentUserId').equalTo(true).onValue,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5));
           }
           if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.chat_bubble_outline, size: 64, color: AppTheme.textMuted),
-                  SizedBox(height: 16),
-                  Text('No messages yet', style: TextStyle(color: AppTheme.textMuted, fontSize: 18)),
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceVariant,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.chat_bubble_outline_rounded, size: 36, color: AppTheme.textMuted.withValues(alpha: 0.4)),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('No conversations yet', style: AppTheme.headingSm.copyWith(color: AppTheme.textMuted)),
+                  const SizedBox(height: 8),
+                  Text('Start chatting about items you\'re interested in', style: AppTheme.bodySm),
                 ],
               ),
             );
@@ -67,45 +89,74 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
           chats.sort((a, b) => (b['lastMessageTime'] ?? 0).compareTo(a['lastMessageTime'] ?? 0));
 
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: chats.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, indent: 80),
             itemBuilder: (context, index) {
               final chat = chats[index];
               final Map participants = chat['participants'] ?? {};
               final otherUserId = participants.keys.firstWhere((k) => k != _currentUserId, orElse: () => 'Unknown');
-              
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                leading: CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppTheme.primaryLight.withOpacity(0.2),
-                  child: const Icon(Icons.person, color: AppTheme.primary),
+              final lastTime = chat['lastMessageTime'] as int? ?? 0;
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  boxShadow: AppTheme.softShadow,
                 ),
-                title: Text(
-                  otherUserId,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                subtitle: Text(
-                  chat['lastMessage'] ?? 'Started a chat',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppTheme.textSecondary),
-                ),
-                trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        chatId: chat['id'],
-                        otherUserId: otherUserId,
-                        itemTitle: chat['itemTitle'],
-                      ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  leading: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.15), blurRadius: 8)],
                     ),
-                  );
-                },
+                    child: const ClipOval(
+                      child: Icon(Icons.person_rounded, color: Colors.white, size: 26),
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          otherUserId,
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: AppTheme.textPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        lastTime > 0 ? _timeAgo(lastTime) : '',
+                        style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      chat['lastMessage'] ?? 'Started a chat',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          chatId: chat['id'],
+                          otherUserId: otherUserId,
+                          itemTitle: chat['itemTitle'],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           );

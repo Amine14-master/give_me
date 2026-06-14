@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
 
-  const PublicProfileScreen({Key? key, required this.userId}) : super(key: key);
+  const PublicProfileScreen({super.key, required this.userId});
 
   @override
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
@@ -49,80 +51,131 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('User Profile'),
-        elevation: 0,
-        backgroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 60,
-              backgroundColor: AppTheme.primaryLight.withOpacity(0.2),
-              backgroundImage: _profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null,
-              child: _profileImageUrl == null
-                  ? const Icon(Icons.person, size: 60, color: AppTheme.primary)
-                  : null,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              widget.userId,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _callUser,
-              icon: const Icon(Icons.call),
-              label: const Text('Call User'),
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+      backgroundColor: AppTheme.scaffoldBg,
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: AppTheme.primaryDark,
+            surfaceTintColor: Colors.transparent,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: const BoxDecoration(gradient: AppTheme.heroGradient),
+                child: SafeArea(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 20),
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 3),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 8)),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          radius: 42,
+                          backgroundColor: Colors.white.withValues(alpha: 0.15),
+                          backgroundImage: _profileImageUrl != null ? CachedNetworkImageProvider(_profileImageUrl!) : null,
+                          child: _profileImageUrl == null
+                              ? const Icon(Icons.person_rounded, size: 44, color: Colors.white)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(widget.userId, style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white)),
+                      const SizedBox(height: 20),
+
+                      // ── CTA ──
+                      GestureDetector(
+                        onTap: _callUser,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.call_rounded, color: Colors.white, size: 18),
+                              const SizedBox(width: 8),
+                              Text('Call', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 32),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Statistics',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+          ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Statistics', style: AppTheme.labelMd),
+                  const SizedBox(height: 14),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.6,
+                    children: [
+                      _buildStatCard('Items Given', '$_posts', AppTheme.primary, Icons.volunteer_activism_rounded),
+                      _buildStatCard('Requests', '$_requestsMade', AppTheme.accent, Icons.pan_tool_rounded),
+                      _buildStatCard('Accepted', '$_accepted', AppTheme.success, Icons.check_circle_rounded),
+                      _buildStatCard('Declined', '$_declined', AppTheme.error, Icons.cancel_rounded),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.5,
-              children: [
-                _buildStatCard('Items Posted', '$_posts', AppTheme.primary),
-                _buildStatCard('Requests Made', '$_requestsMade', AppTheme.accent),
-                _buildStatCard('Accepted', '$_accepted', AppTheme.success),
-                _buildStatCard('Declined', '$_declined', AppTheme.error),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, Color color) {
+  Widget _buildStatCard(String title, String value, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        boxShadow: AppTheme.softShadow,
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-          const SizedBox(height: 4),
-          Text(title, style: TextStyle(color: color.withOpacity(0.8), fontWeight: FontWeight.w600, fontSize: 12), textAlign: TextAlign.center),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: GoogleFonts.inter(color: AppTheme.textMuted, fontWeight: FontWeight.w500, fontSize: 12)),
+              Text(value, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+            ],
+          ),
         ],
       ),
     );
